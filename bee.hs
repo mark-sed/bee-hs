@@ -51,8 +51,26 @@ parsePass :: [String] -> ([Instruction], [String])
 parsePass [] = ([], [])
 parsePass t@("W":":":ts) = ([], t)
 parsePass t@("L":":":ts) = ([], t)
-parsePass t = ((fst $ p) : (fst $ parsePass (snd $ p)), (snd $ p))
-    where p = parseInst t
+parsePass ("CONCAT":v:";":ts) = (CONCAT ((read v)::Int) : (fst $ p), (snd $ p))
+    where p = parsePass ts
+parsePass ("NOP":";":ts) = (NOP : (fst $ p), (snd $ p))
+    where p = parsePass ts
+parsePass (t:_) = fatalError ("Unknown instruction '"++t++"'")
+--parsePass t = ((fst $ p) : (fst $ parsePass (snd $ p)), (snd $ p))
+--    where p = parseInst t
+
+
+m :: String -> (String, String)
+m [] = ([], [])
+m ('.':xs) = ("0", xs)
+m ('+':xs) = ((fst $ ys), (snd $ ys))
+    where ys = m xs
+
+z [] = []
+z ('-':xs) = ["-"]++[fst $ ys]++(z (snd $ ys))
+    where ys = m xs
+z t = [t]
+
 
 tokens2Ebel :: [String] -> Ebel
 tokens2Ebel [] = []

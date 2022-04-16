@@ -1,6 +1,6 @@
 module Main where
 
-import Data.Maybe
+import System.Environment
 
 data Instruction = CONCAT Int
                  | DEL
@@ -17,9 +17,13 @@ type Ebel = [Pass]
 
 data SplitState = SSSTART | SSSTRING deriving (Enum, Show, Eq)
 
+beeDelims :: [Char]
 beeDelims = [' ', '\t']
+
+beeSymbols :: [Char]
 beeSymbols = [':', ';', '?', '(', ')', '{', '}']
 
+fatalError :: String -> a
 fatalError msg = error ("ERROR: " ++ msg ++ ".")
 
 splitDelim :: String -> (String, SplitState) -> (SplitState, [String])
@@ -42,35 +46,15 @@ splitDelim (x:xs) (lst, s)
 splitDelim [] ([], s) = (s, [])
 splitDelim [] (lst, s) = (s, [lst])
 
-parseInst :: [String] -> (Instruction, [String])
-parseInst ("CONCAT":v:";":ts) = (CONCAT ((read v)::Int), ts)
-parseInst ("NOP":";":ts) = (NOP, ts)
-parseInst (t:_) = fatalError ("Unknown instruction '"++t++"'")
-
 parsePass :: [String] -> ([Instruction], [String])
 parsePass [] = ([], [])
-parsePass t@("W":":":ts) = ([], t)
-parsePass t@("L":":":ts) = ([], t)
+parsePass t@("W":":":_) = ([], t)
+parsePass t@("L":":":_) = ([], t)
 parsePass ("CONCAT":v:";":ts) = (CONCAT ((read v)::Int) : (fst $ p), (snd $ p))
     where p = parsePass ts
 parsePass ("NOP":";":ts) = (NOP : (fst $ p), (snd $ p))
     where p = parsePass ts
 parsePass (t:_) = fatalError ("Unknown instruction '"++t++"'")
---parsePass t = ((fst $ p) : (fst $ parsePass (snd $ p)), (snd $ p))
---    where p = parseInst t
-
-
-m :: String -> (String, String)
-m [] = ([], [])
-m ('.':xs) = ("0", xs)
-m ('+':xs) = ((fst $ ys), (snd $ ys))
-    where ys = m xs
-
-z [] = []
-z ('-':xs) = ["-"]++[fst $ ys]++(z (snd $ ys))
-    where ys = m xs
-z t = [t]
-
 
 tokens2Ebel :: [String] -> Ebel
 tokens2Ebel [] = []
@@ -92,10 +76,20 @@ tokenize t
     | otherwise = fatalError "Missing string terminator"
     where s = splitDelim t ("", SSSTART)
 
-y' s = tokens2Ebel $ tokenize s
+pass2String :: [Instruction] -> String
+pass2String [] = []
+pass2String (i:is) = "  " ++ show i ++ "\n" ++ pass2String is
 
-compile :: String -> Maybe String
-compile bee = Just "Bzzz"
+ebel2String :: Ebel -> String
+ebel2String [] = []
+ebel2String ((WordsPass, p):ps) = "PASS Words\n" ++ pass2String p ++ ebel2String ps
+ebel2String ((LinesPass, p):ps) = "PASS Lines\n" ++ pass2String p ++ ebel2String ps
+
+compile :: String -> String
+compile bee = (ebel2String . tokens2Ebel . tokenize) bee
 
 main :: IO()
-main = putStrLn "Bzzz!"
+main = do
+    args <- getArgs
+    putStr $ compile $ (args!!0)
+

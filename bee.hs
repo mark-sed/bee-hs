@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 {- |
 Module     : bee.hs
 Description: Bee language compiler
@@ -15,6 +13,7 @@ The compiler compiles down to Ebel language.
 module Main where
 
 import System.Environment
+import Data.Char
 
 -- | Ebel instructions
 -- | Show will be used to output them.
@@ -28,6 +27,7 @@ data Instruction = CONCAT Int
 -- | Possible pass types
 data PassType = WordsPass 
               | LinesPass 
+              | ExpressionPass String
               deriving (Show, Eq)
 
 -- | Pass IR
@@ -39,15 +39,16 @@ type Ebel = [Pass]
 -- | Parsing state to correctly parse strings
 data SplitState = SSSTART 
                 | SSSTRING 
+                | SSCOMMENT
                 deriving (Enum, Show, Eq)
 
 -- | Delimiters, which are ignored by Bee
 beeDelims :: [Char]
-beeDelims = [' ', '\t']
+beeDelims = [' ', '\t', '\n']
 
 -- | Symbols recognized by Bee
 beeSymbols :: [Char]
-beeSymbols = [':', ';', '?', '(', ')', '{', '}']
+beeSymbols = [':', ';', '?', '(', ')', '{', '}', '@']
 
 -- | Function to print error 
 fatalError :: String -> a
@@ -56,10 +57,15 @@ fatalError msg = error ("ERROR: " ++ msg ++ ".")
 -- | Splits string into lexemes
 splitDelim :: String -> (String, SplitState) -> (SplitState, [String])
 splitDelim (x:xs) (lst, s)
+    | s == SSCOMMENT && x == '\n' = (fst $ s6, (snd $ s6))
+    | s == SSCOMMENT = (fst $ s7, (snd $ s7))
     | s == SSSTRING && x == '"' = (fst $ s3, (lst++[x]) : (snd $ s3))
+    | s == SSSTRING && x == '\n' = fatalError "Missing closing string quote"
     | s == SSSTRING = (fst $ s4, (snd $ s4))
     | x == '"' && null lst = (fst $ s5, (snd $ s5))
     | x == '"' = (fst s5, lst : (snd $ s5))
+    | x == '#' && null lst = (fst $ s7, (snd $ s7))
+    | x == '#' = (fst s7, lst : (snd $ s7))
     | x `elem` beeSymbols && null lst = (fst $ s1, [x] : (snd $ s1))
     | x `elem` beeSymbols = (fst $ s1, lst : [x] : (snd $ s1))
     | x `elem` beeDelims && null lst = (fst $ s1, (snd $ s1))
@@ -71,6 +77,8 @@ splitDelim (x:xs) (lst, s)
         s3 = splitDelim xs ("", SSSTART)
         s4 = splitDelim xs ((lst++[x]), SSSTRING)
         s5 = splitDelim xs ("\"", SSSTRING)
+        s6 = splitDelim xs ("", SSSTART)
+        s7 = splitDelim xs ("", SSCOMMENT)
 splitDelim [] ([], s) = (s, [])
 splitDelim [] (lst, s) = (s, [lst])
 
@@ -78,20 +86,26 @@ splitDelim [] (lst, s) = (s, [lst])
 parsePass :: [String] -> ([Instruction], [String])
 parsePass [] = ([], [])
 parsePass t@("{":_) = ([], t)
-parsePass t@("W":":":_) = ([], t)
-parsePass t@("L":":":_) = ([], t)
-parsePass ("CONCAT":v:";":ts) = (CONCAT ((read v)::Int) : (fst $ p), (snd $ p))
+parsePass t@(p:":":_) 
+    -- New pass
+    | p == "W" || p == "L" || p == "Words" || p == "Lines" = ([], t)
+--parsePass (m:"->":r:";":ts)
+    -- Expression value match    
+--    | 
+parsePass (i:";":ts)
+    -- 0 argument instructions
+    | iu == "DEL"  = (DEL : (fst $ p), (snd $ p))
+    | iu == "LOOP" || iu == "}" = (LOOP : (fst $ p), (snd $ p))
+    | iu == "NOP"  = (NOP  : (fst $ p), (snd $ p))
     where p = parsePass ts
-parsePass ("DEL":";":ts) = (DEL : (fst $ p), (snd $ p))
+          iu = (map toUpper) i
+parsePass (i:v:";":ts)
+    -- 1 argument instructions
+    | iu == "CONCAT" = (CONCAT ((read v)::Int) : (fst $ p), (snd $ p))
+    | iu == "SWAP"   = (SWAP   ((read v)::Int) : (fst $ p), (snd $ p))
+    | otherwise = fatalError ("Unknwon instruction '"++i++"'")
     where p = parsePass ts
-parsePass ("LOOP":";":ts) = (LOOP : (fst $ p), (snd $ p))
-    where p = parsePass ts
-parsePass ("NOP":";":ts) = (NOP : (fst $ p), (snd $ p))
-    where p = parsePass ts
-parsePass ("SWAP":v:";":ts) = (SWAP ((read v)::Int) : (fst $ p), (snd $ p))
-    where p = parsePass ts
-parsePass ("}":";":ts) = (LOOP : (fst $ p), (snd $ p))
-    where p = parsePass ts
+          iu = (map toUpper) i
 parsePass ("}":ts) = (LOOP : (fst $ p), (snd $ p))
     where p = parsePass ts
 parsePass (t:_) = fatalError ("Unknown instruction '"++t++"'")
@@ -101,19 +115,19 @@ tokens2Ebel :: [String] -> Ebel
 tokens2Ebel [] = []
 tokens2Ebel ("W":":":[]) = []
 tokens2Ebel ("L":":":[]) = []
-tokens2Ebel ("W":":":"{":ts) = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
+tokens2Ebel (pn:":":"{":ts)
+    | pn == "W" || pn == "Words" = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
+    | pn == "L" || pn == "Lines" = (LinesPass, (fst $ p)) : tokens2Ebel (snd $ p)
+    | otherwise = fatalError ("Incorrect pass name '"++pn++"'")
     where
         p = parsePass ts
-tokens2Ebel ("L":":":"{":ts) = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
-    where
-        p = parsePass ts
-tokens2Ebel ("W":":":ts) = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
+tokens2Ebel (pn:":":ts)  
+    | pn == "W" || pn == "Words" = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
+    | pn == "L" || pn == "Lines" = (LinesPass, (fst $ p)) : tokens2Ebel (snd $ p)
+    | otherwise = fatalError ("Incorrect pass name '"++pn++"'")
     where
         p = parsePass ts
 tokens2Ebel ("{":ts) = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
-    where
-        p = parsePass ts
-tokens2Ebel ("L":":":ts) = (LinesPass, (fst $ p)) : tokens2Ebel (snd $ p)
     where
         p = parsePass ts
 tokens2Ebel t = (WordsPass, (fst $ p)) : tokens2Ebel (snd $ p)
@@ -138,7 +152,7 @@ checkParen [] _ = fatalError "Mismatched parenthesis"
 -- | Scanner, returns list of tokens
 tokenize :: String -> [String]
 tokenize t
-    | fst s == SSSTART = checkParen ( snd s ) []     
+    | fst s == SSSTART || fst s == SSCOMMENT = checkParen ( snd s ) []     
     | otherwise = fatalError "Missing string terminator"
     where s = splitDelim t ("", SSSTART)
 
@@ -152,6 +166,7 @@ ebel2String :: Ebel -> String
 ebel2String [] = []
 ebel2String ((WordsPass, p):ps) = "PASS Words\n" ++ pass2String p ++ ebel2String ps
 ebel2String ((LinesPass, p):ps) = "PASS Lines\n" ++ pass2String p ++ ebel2String ps
+ebel2String ((ExpressionPass s, p):ps) = "Pass " ++ s ++ " Expression\n" ++ pass2String p ++ ebel2String ps
 
 -- | Compiles Bee string into Ebel string
 compile :: String -> String

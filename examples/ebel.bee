@@ -1,0 +1,15 @@
+# This bee script contains inline ebel code
+# The script deletes every even column and concats every other line
+#
+
+{ NOP; DEL; } L:{ NOP; CONCAT 1; }
+
+# Result
+# Pass Words
+#   NOP
+#   DEL
+#   LOOP
+# Pass
+#   NOP
+#   CONCAT 1
+#   LOOP

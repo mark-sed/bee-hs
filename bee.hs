@@ -89,9 +89,6 @@ parsePass t@("{":_) = ([], t)
 parsePass t@(p:":":_) 
     -- New pass
     | p == "W" || p == "L" || p == "Words" || p == "Lines" = ([], t)
---parsePass (m:"->":r:";":ts)
-    -- Expression value match    
---    | 
 parsePass (i:";":ts)
     -- 0 argument instructions
     | iu == "DEL"  = (DEL : (fst $ p), (snd $ p))

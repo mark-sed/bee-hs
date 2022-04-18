@@ -23,7 +23,9 @@ This example could be replaced using `@i` (index) variable and condition.
 
 ## Conditions
 
-`cond ? true_part : false_part`
+```
+cond ? true_part : false_part
+```
 
 Condition has syntax similar to ternary operator in C language, but does not require the else clause.
 
@@ -51,7 +53,7 @@ Expressions can be only part of a condition and are the same as user defined exp
 
 Example of modifying all number values:
 ```
-
+{ NUMBER ? ($ + 42) * 3; }
 ```
 
 ## Passes

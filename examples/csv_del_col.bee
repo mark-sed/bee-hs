@@ -4,7 +4,7 @@
 #
 # Args: -csv: To let know what parser should ebe use
 
-@col == 4 ? del;
+$col == 4 ? del;
 
 
 # Result:
@@ -20,5 +20,5 @@
 
 
 # Alternatives:
-# @i == 7 ? del;
+# $i == 7 ? del;
 

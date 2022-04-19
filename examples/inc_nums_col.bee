@@ -1,9 +1,7 @@
 # This bee script increments 4th column value if it is a NUMBER
-# @t checks the type; Possibly just NUMBER could be used (@t is implicit)
 # 
-# No args
 
-@i == 4 && @t == NUMBER ? $ + 42;
+$i == 4 && NUMBER ? $ + 42;
 
 # Result:
 # Pass Words
@@ -16,6 +14,3 @@
 #   Pass DERIVED Expression
 #     RETURN NOP
 #
-
-# Alternatives:
-# @i == 4 && NUMBER ? $ + 42;

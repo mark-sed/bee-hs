@@ -21,6 +21,16 @@ The following example deletes 43rd word or every line:
 ```
 This example could be replaced using `@i` (index) variable and condition.
 
+## Bee variables
+
+Bee scripts can use special variables to simplify writing the code. These variables represent Ebel instructions.
+
+Every Bee variable has a `$` prefix.
+
+* __`$`__ - Current word's value in it's real type. Same as in Ebe user defined expressions. Can be used only in expression.
+* __`$i`__, __`$index`__ - Objects index, starting with 1.
+* __`$col`__, __`$column`__ - Can be used in column based formats (like csv) to select specific column. The `$col` variable is an alias for `$i * 2 - 1`. Starts from 1.
+
 ## Conditions
 
 ```

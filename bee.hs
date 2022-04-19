@@ -97,11 +97,25 @@ parsePass (i:v:";":ts)
     -- 1 argument instructions
     | iu == "CONCAT" = (CONCAT (read v::Int) : (fst p), snd p)
     | iu == "SWAP"   = (SWAP   (read v::Int) : (fst p), snd p)
+    -- 0 argument instructions with multiplier
+    | mu < 1 = fatalError "Instruction multiplier has to be positive integer"
+    | vu == "DEL"  = ((take mu $ repeat DEL) ++ (fst p), snd p)
+    | vu == "LOOP" = ((take mu $ repeat LOOP) ++ (fst p), snd p)
+    | vu == "NOP"  = ((take mu $ repeat NOP)  ++ (fst p), snd p)
     | otherwise = fatalError ("Unknwon instruction '"++i++"'")
     where p = parsePass ts
           iu = map toUpper i
+          vu = map toUpper v
+          mu = read i::Int
 parsePass ("}":ts) = (LOOP : fst p, snd p)
     where p = parsePass ts
+parsePass (m:i:v:";":ts)
+    -- 1 argument instructions
+    | iu == "CONCAT" = ((take mu $ repeat $ CONCAT (read v::Int)) ++ (fst p), snd p)
+    | iu == "SWAP"   = ((take mu $ repeat $ SWAP   (read v::Int)) ++ (fst p), snd p)
+    where p = parsePass ts
+          iu = map toUpper i
+          mu = read m::Int
 parsePass (t:_) = fatalError ("Unknown instruction '"++t++"'")
 
 -- | Parser, constructs Ebel IR from tokens

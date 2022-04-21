@@ -79,6 +79,35 @@ splitDelim (x:xs) (lst, s)
 splitDelim [] ([], s) = (s, [])
 splitDelim [] (lst, s) = (s, [lst])
 
+
+-- | Parse instruction
+parseInst :: [String] -> Instruction
+parseInst [] = fatalError "Missing instruction"
+parseInst [i]
+    | iu == "DEL" = DEL
+    | iu == "LOOP" = LOOP -- Should this be allowed?
+    | iu == "NOP" = NOP
+    | otherwise = fatalError ("Unknown instruction '"++i++"'")
+    where
+        iu = (map toUpper) i
+parseInst (i:v:_)
+    | iu == "CONCAT" = CONCAT vu
+    | iu == "SWAP" = SWAP vu
+    | otherwise = fatalError ("Unknown instruction '"++i++"'")
+    where
+        iu = (map toUpper) i
+        vu = read v::Int 
+
+-- | Parse condition
+parseCond :: String -> [String] -> Pass
+parseCond c i
+    | cu == "TEXT" || cu == "NUMBER" || cu == "DERIVED" || cu == "FLOAT" 
+        || cu == "SYMBOL" || cu == "DELIMITER" || cu == "EMPTY" 
+        || head c == '"' = (ExpressionPass c, [parseInst i])
+    | otherwise = fatalError ("Incorrect condition '"++c++"'")
+    where
+        cu = (map toUpper) c
+
 -- | Parses one pass in the code
 parsePass :: [String] -> ([Instruction], [String])
 parsePass [] = ([], [])
@@ -138,6 +167,14 @@ tokens2Ebel (pn:":":ts)
 tokens2Ebel ("{":ts) = (WordsPass, fst p) : tokens2Ebel (snd p)
     where
         p = parsePass ts
+-- Conditions
+tokens2Ebel (c:"?":i:";":ts) = parseCond c [i] : parseCond "DERIVED" ["NOP"] : tokens2Ebel ts
+tokens2Ebel (c:"?":i:":":e:";":ts) = parseCond c [i] : parseCond "DERIVED" [e] : tokens2Ebel ts
+tokens2Ebel (c:"?":i:v:";":ts) = parseCond c [i, v] : parseCond "DERIVED" ["NOP"] : tokens2Ebel ts
+tokens2Ebel (c:"?":i:v:":":e:";":ts) = parseCond c [i, v] : parseCond "DERIVED" [e] : tokens2Ebel ts
+tokens2Ebel (c:"?":i:v:":":e:ev:";":ts) = parseCond c [i, v] : parseCond "DERIVED" [e, ev] : tokens2Ebel ts
+tokens2Ebel (c:"?":i:":":e:v:";":ts) = parseCond c [i] : parseCond "DERIVED" [e, v] : tokens2Ebel ts
+tokens2Ebel (_:"?":_) = fatalError "Incorrect condition syntax"
 tokens2Ebel t = (WordsPass, fst p) : tokens2Ebel (snd p)
     where
         p = parsePass t
@@ -169,12 +206,17 @@ pass2String :: [Instruction] -> String
 pass2String [] = []
 pass2String (i:is) = "  " ++ show i ++ "\n" ++ pass2String is
 
+exprPass2String :: [Instruction] -> String
+exprPass2String [] = []
+exprPass2String [i] = "  RETURN " ++ show i ++ "\n"
+exprPass2String (i:is) = "    " ++ show i ++ "\n" ++ exprPass2String is
+
 -- | Converts Ebel IR into String
 ebel2String :: Ebel -> String
 ebel2String [] = []
 ebel2String ((WordsPass, p):ps) = "PASS Words\n" ++ pass2String p ++ ebel2String ps
 ebel2String ((LinesPass, p):ps) = "PASS Lines\n" ++ pass2String p ++ ebel2String ps
-ebel2String ((ExpressionPass s, p):ps) = "Pass " ++ s ++ " Expression\n" ++ pass2String p ++ ebel2String ps
+ebel2String ((ExpressionPass s, p):ps) = "Pass " ++ s ++ " Expression\n" ++ exprPass2String p ++ ebel2String ps
 
 -- | Compiles Bee string into Ebel string
 compile :: String -> String

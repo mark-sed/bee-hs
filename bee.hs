@@ -16,7 +16,7 @@ import System.Environment
 import Data.Char
 import Parser
 
-compile _ = "Bzzz" 
+compile _ = "Bzzz" --TODO: Always add requires 0.3.1 since floats might be used... or even check for exact min version needed.
 
 -- | Entry point
 -- | Takes the code as an argument

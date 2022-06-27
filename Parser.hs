@@ -235,6 +235,36 @@ expr2Ebel v Var = Right (v, [MOVE "$" "$"])
 expr2Ebel v (IVal a) = Right (v, [MOVE "$" (show a)])
 expr2Ebel _ _ = Left "Incorrect expression"
 
+isBeeDelim :: Char -> Bool
+isBeeDelim a = a `elem` [' ', '\n', '\t']
+
+isBeeOperator :: Char -> Bool
+isBeeOperator a = a `elem` [';', '?', ':', '+', '-', '/', '%', '^', '(', ')', '{', '}', '[', ']']
+
+getTokenStr :: String -> String -> Either String (String, String)
+getTokenStr [] _ = Left "Missing closing quote symbol"
+getTokenStr ('"':xs) s = Right ('"':s++['"'], xs)
+getTokenStr (x:xs) s = getTokenStr xs $ s++[x]
+
+
+-- TODO: Error does not get propagated
+tokenize :: String -> Either String [String]
+tokenize [] = Right []
+tokenize code
+    | isBeeDelim (head code) = tokenize (tail code)
+    | isBeeOperator (head code) = Right (fst s1 : (fromRight ["ERROR1"] (tokenize (snd s1))))
+    | head code == '"' = if isLeft s3 then Left (fromLeft "ERROR2" s3) else Right (fst s4 : (fromRight ["ERROR3"] (tokenize (snd s4))))
+    | otherwise = Right (fst s2 : (fromRight ["ERROR4"] (tokenize (snd s2))))
+    where s1 = span (\a -> isBeeOperator a) code
+          s2 = span (\a -> not ((isBeeDelim a) || (isBeeOperator a))) code
+          s3 = getTokenStr (tail code) ""
+          s4 = fromRight ("ERROR5", "ERROR6") s3
+          
+
+-- TODO: Parse expression to list of strings
+--       Convert the list into prefix notation
+--       Tree can be then generated 
+
 -- | Parses string expression into AST
 -- | If left is returned, then Error was encountered
 str2Expr :: String -> Either String Expr

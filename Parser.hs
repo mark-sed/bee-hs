@@ -241,25 +241,29 @@ isBeeDelim a = a `elem` [' ', '\n', '\t']
 isBeeOperator :: Char -> Bool
 isBeeOperator a = a `elem` [';', '?', ':', '+', '-', '/', '%', '^', '(', ')', '{', '}', '[', ']']
 
+isBeeVarVal :: Char -> Bool
+isBeeVarVal a = a `elem` (['.', '$', '_'] ++ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'])
+
 getTokenStr :: String -> String -> Either String (String, String)
 getTokenStr [] _ = Left "Missing closing quote symbol"
 getTokenStr ('"':xs) s = Right ('"':s++['"'], xs)
 getTokenStr (x:xs) s = getTokenStr xs $ s++[x]
 
-
--- TODO: Error does not get propagated
+-- FIXME: Error does not get propagated since fromRight is used and Left is ignored
 tokenize :: String -> Either String [String]
 tokenize [] = Right []
 tokenize code
+    | (length code > 2) && ((take 2 code) `elem` ["==", "!=", "&&", "||"]) = Right ((take 2 code) : (fromRight ["ERROR8"] (tokenize (drop 2 code))))
     | isBeeDelim (head code) = tokenize (tail code)
     | isBeeOperator (head code) = Right (fst s1 : (fromRight ["ERROR1"] (tokenize (snd s1))))
     | head code == '"' = if isLeft s3 then Left (fromLeft "ERROR2" s3) else Right (fst s4 : (fromRight ["ERROR3"] (tokenize (snd s4))))
+    | isBeeVarVal (head code) = Right (fst s5 : (fromRight ["ERROR7"] (tokenize (snd s5))))
     | otherwise = Right (fst s2 : (fromRight ["ERROR4"] (tokenize (snd s2))))
     where s1 = span (\a -> isBeeOperator a) code
           s2 = span (\a -> not ((isBeeDelim a) || (isBeeOperator a))) code
           s3 = getTokenStr (tail code) ""
           s4 = fromRight ("ERROR5", "ERROR6") s3
-          
+          s5 = span (\a -> isBeeVarVal a) code
 
 -- TODO: Parse expression to list of strings
 --       Convert the list into prefix notation
